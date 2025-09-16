@@ -605,7 +605,7 @@ function updateSummary() {
   animateValue('totalTrades', totalTrades);
   animateValue('winRate', winRate.toFixed(1) + '%');
   animateValue('avgReturn', (avgReturn >= 0 ? '+' : '') + avgReturn.toFixed(2) + '%');
-  animateValue('totalPL', (totalPL >= 0 ? '+₹' : '-₹') + Math.abs(totalPL).toFixed(2));
+  animateValue('totalPL', (totalPL >= 0 ? '+₹' : '₹') + totalPL.toFixed(2));
 
   // Update colors based on performance
   const totalPLElement = document.getElementById('totalPL');
@@ -757,7 +757,7 @@ function openAllTrades() {
             <p>Total Trades</p>
           </div>
           <div class="summary-item">
-            <h3 class="${totalPL >= 0 ? 'profit' : 'loss'}">${totalPL >= 0 ? '+' : ''}₹${totalPL.toFixed(2)}</h3>
+            <h3 class="${totalPL >= 0 ? 'profit' : 'loss'}">${totalPL >= 0 ? '+₹' : '₹'}${totalPL.toFixed(2)}</h3>
             <p>Total P/L</p>
           </div>
           <div class="summary-item">
@@ -799,7 +799,7 @@ function openAllTrades() {
         <td>${t.quantity}</td>
         <td>₹${parseFloat(t.buy_price).toFixed(2)}</td>
         <td>₹${parseFloat(t.sell_price).toFixed(2)}</td>
-        <td class="${pl >= 0 ? 'profit' : 'loss'}">${pl >= 0 ? '+' : ''}₹${pl.toFixed(2)}</td>
+        <td class="${pl >= 0 ? 'profit' : 'loss'}">${pl >= 0 ? '+₹' : '₹'}${pl.toFixed(2)}</td>
         <td class="${returnPct >= 0 ? 'profit' : 'loss'}">${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</td>
       </tr>
     `;
