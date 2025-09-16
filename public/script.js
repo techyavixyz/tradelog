@@ -174,15 +174,15 @@ function renderTrades() {
     row.innerHTML = `
       <td>${formatDate(t.trade_date)}</td>
       <td><strong>${t.symbol}</strong></td>
-      <td>$${parseFloat(t.strike_price).toFixed(2)}</td>
+      <td>₹${parseFloat(t.strike_price).toFixed(2)}</td>
       <td>
         <span class="badge ${t.option_type.toLowerCase()}">${t.option_type}</span>
       </td>
       <td>${t.quantity}</td>
-      <td>$${parseFloat(t.buy_price).toFixed(2)}</td>
-      <td>$${parseFloat(t.sell_price).toFixed(2)}</td>
+      <td>₹${parseFloat(t.buy_price).toFixed(2)}</td>
+      <td>₹${parseFloat(t.sell_price).toFixed(2)}</td>
       <td class="${pl >= 0 ? 'profit' : 'loss'}">
-        <strong>${pl >= 0 ? '+' : ''}$${pl.toFixed(2)}</strong>
+        <strong>${pl >= 0 ? '+' : ''}₹${pl.toFixed(2)}</strong>
       </td>
       <td class="${returnPct >= 0 ? 'profit' : 'loss'}">
         <strong>${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</strong>
@@ -428,7 +428,7 @@ function updateCharts() {
         tooltip: {
           callbacks: {
             label: function(context) {
-              return `P/L: $${context.parsed.y.toFixed(2)}`;
+              return `P/L: ₹${context.parsed.y.toFixed(2)}`;
             }
           }
         }
@@ -438,7 +438,7 @@ function updateCharts() {
           beginAtZero: true,
           ticks: {
             callback: function(value) {
-              return '$' + value.toFixed(0);
+              return '₹' + value.toFixed(0);
             }
           }
         },
@@ -479,7 +479,7 @@ function updateCharts() {
         tooltip: {
           callbacks: {
             label: function(context) {
-              return `Cumulative P/L: $${context.parsed.y.toFixed(2)}`;
+              return `Cumulative P/L: ₹${context.parsed.y.toFixed(2)}`;
             }
           }
         }
@@ -489,7 +489,7 @@ function updateCharts() {
           beginAtZero: true,
           ticks: {
             callback: function(value) {
-              return '$' + value.toFixed(0);
+              return '₹' + value.toFixed(0);
             }
           }
         },
@@ -528,7 +528,7 @@ function updateCharts() {
             label: function(context) {
               const total = profits + losses;
               const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-              return `${context.label}: $${context.parsed.toFixed(2)} (${percentage}%)`;
+              return `${context.label}: ₹${context.parsed.toFixed(2)} (${percentage}%)`;
             }
           }
         }
@@ -567,7 +567,7 @@ function updateCharts() {
         tooltip: {
           callbacks: {
             label: function(context) {
-              return `P/L: $${context.parsed.y.toFixed(2)}`;
+              return `P/L: ₹${context.parsed.y.toFixed(2)}`;
             }
           }
         }
@@ -577,7 +577,7 @@ function updateCharts() {
           beginAtZero: true,
           ticks: {
             callback: function(value) {
-              return '$' + value.toFixed(0);
+              return '₹' + value.toFixed(0);
             }
           }
         },
@@ -605,7 +605,7 @@ function updateSummary() {
   animateValue('totalTrades', totalTrades);
   animateValue('winRate', winRate.toFixed(1) + '%');
   animateValue('avgReturn', (avgReturn >= 0 ? '+' : '') + avgReturn.toFixed(2) + '%');
-  animateValue('totalPL', (totalPL >= 0 ? '+$' : '-$') + Math.abs(totalPL).toFixed(2));
+  animateValue('totalPL', (totalPL >= 0 ? '+₹' : '-₹') + Math.abs(totalPL).toFixed(2));
 
   // Update colors based on performance
   const totalPLElement = document.getElementById('totalPL');
@@ -757,7 +757,7 @@ function openAllTrades() {
             <p>Total Trades</p>
           </div>
           <div class="summary-item">
-            <h3 class="${totalPL >= 0 ? 'profit' : 'loss'}">${totalPL >= 0 ? '+' : ''}$${totalPL.toFixed(2)}</h3>
+            <h3 class="${totalPL >= 0 ? 'profit' : 'loss'}">${totalPL >= 0 ? '+' : ''}₹${totalPL.toFixed(2)}</h3>
             <p>Total P/L</p>
           </div>
           <div class="summary-item">
@@ -794,12 +794,12 @@ function openAllTrades() {
       <tr>
         <td>${formatDate(t.trade_date)}</td>
         <td><strong>${t.symbol}</strong></td>
-        <td>$${parseFloat(t.strike_price).toFixed(2)}</td>
+        <td>₹${parseFloat(t.strike_price).toFixed(2)}</td>
         <td>${t.option_type}</td>
         <td>${t.quantity}</td>
-        <td>$${parseFloat(t.buy_price).toFixed(2)}</td>
-        <td>$${parseFloat(t.sell_price).toFixed(2)}</td>
-        <td class="${pl >= 0 ? 'profit' : 'loss'}">${pl >= 0 ? '+' : ''}$${pl.toFixed(2)}</td>
+        <td>₹${parseFloat(t.buy_price).toFixed(2)}</td>
+        <td>₹${parseFloat(t.sell_price).toFixed(2)}</td>
+        <td class="${pl >= 0 ? 'profit' : 'loss'}">${pl >= 0 ? '+' : ''}₹${pl.toFixed(2)}</td>
         <td class="${returnPct >= 0 ? 'profit' : 'loss'}">${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</td>
       </tr>
     `;
@@ -820,26 +820,3 @@ function openAllTrades() {
   
   showNotification("All trades opened in new window", "info");
 }
-
-// Add CSS for badges
-const additionalStyle = document.createElement('style');
-additionalStyle.textContent = `
-  .badge {
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  .badge.call {
-    background: rgba(40, 167, 69, 0.1);
-    color: #28a745;
-    border: 1px solid rgba(40, 167, 69, 0.3);
-  }
-  .badge.put {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-    border: 1px solid rgba(220, 53, 69, 0.3);
-  }
-`;
-document.head.appendChild(additionalStyle);
