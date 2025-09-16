@@ -19,8 +19,15 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Logger middleware
 app.use((req, res, next) => {
-  console.log(chalk.blue(`➡️ [${req.method}] ${req.url}`));
+  const timestamp = new Date().toISOString();
+  console.log(chalk.blue(`➡️ [${timestamp}] [${req.method}] ${req.url}`));
   next();
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(chalk.red('❌ Error:'), err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
 // 🔐 SSL Config Handling (local + Vercel)
@@ -100,76 +107,197 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // -------- AUTH APIs --------
 app.post("/auth/register", async (req, res) => {
-  const { email, password } = req.body;
-  const hashed = await bcrypt.hash(password, 10);
   try {
+    const { email, password } = req.body;
+    
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "Email and password are required" });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters long" });
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: "Please enter a valid email address" });
+    }
+    
+    const hashed = await bcrypt.hash(password, 12);
     await connection.query("INSERT INTO users (email, password) VALUES (?,?)", [email, hashed]);
+    console.log(chalk.green(`✅ New user registered: ${email}`));
     res.json({ success: true, message: "User registered" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ success: false, message: "User already exists" });
+    console.error(chalk.red('❌ Registration error:'), err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ success: false, message: "Email already exists" });
+    } else {
+      res.status(500).json({ success: false, message: "Registration failed" });
+    }
   }
 });
 
 app.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  const [rows] = await connection.query("SELECT * FROM users WHERE email=?", [email]);
-  if (rows.length === 0) return res.status(401).json({ success: false, message: "Invalid credentials" });
+  try {
+    const { email, password } = req.body;
+    
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "Email and password are required" });
+    }
+    
+    const [rows] = await connection.query("SELECT * FROM users WHERE email=?", [email]);
+    if (rows.length === 0) {
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
 
-  const user = rows[0];
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ success: false, message: "Invalid credentials" });
+    const user = rows[0];
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
 
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
-  res.json({ success: true, token });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "24h" });
+    console.log(chalk.green(`✅ User logged in: ${email}`));
+    res.json({ success: true, token });
+  } catch (err) {
+    console.error(chalk.red('❌ Login error:'), err);
+    res.status(500).json({ success: false, message: "Login failed" });
+  }
 });
 
 // -------- Middleware --------
 function authMiddleware(req, res, next) {
   const auth = req.headers["authorization"];
-  if (!auth) return res.status(401).json({ message: "Missing token" });
+  if (!auth || !auth.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Missing or invalid authorization header" });
+  }
 
   try {
     const decoded = jwt.verify(auth.split(" ")[1], JWT_SECRET);
     req.user = decoded;
     next();
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
+  } catch (err) {
+    console.error(chalk.yellow('⚠️ Invalid token:'), err.message);
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
 }
 
 // -------- Trades APIs --------
 app.get("/api/trades", authMiddleware, async (req, res) => {
-  const [rows] = await connection.query("SELECT * FROM trades WHERE user_id=? ORDER BY id DESC", [req.user.id]);
-  res.json(rows);
+  try {
+    const [rows] = await connection.query(
+      "SELECT * FROM trades WHERE user_id=? ORDER BY trade_date DESC, id DESC", 
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(chalk.red('❌ Error fetching trades:'), err);
+    res.status(500).json({ success: false, message: "Failed to fetch trades" });
+  }
 });
 
 app.post("/api/trades", authMiddleware, async (req, res) => {
-  const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
-  await connection.query(
-    "INSERT INTO trades (user_id, trade_date, symbol, strike_price, option_type, quantity, buy_price, sell_price, pl, return_pct) VALUES (?,?,?,?,?,?,?,?,?,?)",
-    [req.user.id, date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct]
-  );
-  res.json({ success: true });
+  try {
+    const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
+    
+    // Validation
+    if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !sellPrice) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+    
+    if (quantity <= 0 || buyPrice <= 0 || sellPrice <= 0 || strikePrice <= 0) {
+      return res.status(400).json({ success: false, message: "Numeric values must be greater than 0" });
+    }
+    
+    if (!['Call', 'Put'].includes(optionType)) {
+      return res.status(400).json({ success: false, message: "Option type must be Call or Put" });
+    }
+    
+    await connection.query(
+      "INSERT INTO trades (user_id, trade_date, symbol, strike_price, option_type, quantity, buy_price, sell_price, pl, return_pct) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      [req.user.id, date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct]
+    );
+    
+    console.log(chalk.green(`✅ Trade added for user ${req.user.email}: ${symbol} ${optionType}`));
+    res.json({ success: true, message: "Trade added successfully" });
+  } catch (err) {
+    console.error(chalk.red('❌ Error adding trade:'), err);
+    res.status(500).json({ success: false, message: "Failed to add trade" });
+  }
 });
 
 app.put("/api/trades/:id", authMiddleware, async (req, res) => {
-  const { id } = req.params;
-  const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
-  await connection.query(
-    "UPDATE trades SET trade_date=?, symbol=?, strike_price=?, option_type=?, quantity=?, buy_price=?, sell_price=?, pl=?, return_pct=? WHERE id=? AND user_id=?",
-    [date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct, id, req.user.id]
-  );
-  res.json({ success: true });
+  try {
+    const { id } = req.params;
+    const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
+    
+    // Validation
+    if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !sellPrice) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+    
+    if (quantity <= 0 || buyPrice <= 0 || sellPrice <= 0 || strikePrice <= 0) {
+      return res.status(400).json({ success: false, message: "Numeric values must be greater than 0" });
+    }
+    
+    if (!['Call', 'Put'].includes(optionType)) {
+      return res.status(400).json({ success: false, message: "Option type must be Call or Put" });
+    }
+    
+    const [result] = await connection.query(
+      "UPDATE trades SET trade_date=?, symbol=?, strike_price=?, option_type=?, quantity=?, buy_price=?, sell_price=?, pl=?, return_pct=? WHERE id=? AND user_id=?",
+      [date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct, id, req.user.id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "Trade not found or access denied" });
+    }
+    
+    console.log(chalk.green(`✅ Trade updated for user ${req.user.email}: ID ${id}`));
+    res.json({ success: true, message: "Trade updated successfully" });
+  } catch (err) {
+    console.error(chalk.red('❌ Error updating trade:'), err);
+    res.status(500).json({ success: false, message: "Failed to update trade" });
+  }
 });
 
 app.delete("/api/trades/:id", authMiddleware, async (req, res) => {
-  const { id } = req.params;
-  await connection.query("DELETE FROM trades WHERE id=? AND user_id=?", [id, req.user.id]);
-  res.json({ success: true });
+  try {
+    const { id } = req.params;
+    const [result] = await connection.query("DELETE FROM trades WHERE id=? AND user_id=?", [id, req.user.id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "Trade not found or access denied" });
+    }
+    
+    console.log(chalk.green(`✅ Trade deleted for user ${req.user.email}: ID ${id}`));
+    res.json({ success: true, message: "Trade deleted successfully" });
+  } catch (err) {
+    console.error(chalk.red('❌ Error deleting trade:'), err);
+    res.status(500).json({ success: false, message: "Failed to delete trade" });
+  }
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    success: true, 
+    message: "Server is running", 
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// 404 handler for API routes
+app.use("/api/*", (req, res) => {
+  res.status(404).json({ success: false, message: "API endpoint not found" });
 });
 
 // Start server
-app.listen(process.env.PORT || 3000, () => {
-  console.log(chalk.green(`🚀 Server running at http://localhost:${process.env.PORT || 3000}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(chalk.green(`🚀 Server running at http://localhost:${PORT}`));
+  console.log(chalk.blue(`📊 Dashboard: http://localhost:${PORT}/index.html`));
+  console.log(chalk.blue(`🔐 Login: http://localhost:${PORT}/login.html`));
 });
