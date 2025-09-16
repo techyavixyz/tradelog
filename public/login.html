@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Trade Log</title>
+  <style>
+    body { font-family: Arial; background: #f8f9fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .login-box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); width: 300px; }
+    h2 { text-align: center; }
+    input, button { width: 100%; padding: 8px; margin: 8px 0; border-radius: 5px; border: 1px solid #ccc; }
+    button { background: #007bff; color: white; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .toggle { text-align: center; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2 id="formTitle">Login</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="submitForm()">Login</button>
+    <div class="toggle">
+      <a href="#" onclick="toggleForm()">Don’t have an account? Register</a>
+    </div>
+  </div>
+
+  <script>
+    let isRegister = false;
+
+    async function submitForm() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const endpoint = isRegister ? "/auth/register" : "/auth/login";
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (!isRegister) {
+          // Save token & user info
+          localStorage.setItem("token", data.token);
+          localStorage.setItem("email", email);
+          window.location.href = "/index.html"; // redirect to dashboard
+        } else {
+          alert("Registered! Now login.");
+          toggleForm();
+        }
+      } else {
+        alert(data.message || "Error");
+      }
+    }
+
+    function toggleForm() {
+      isRegister = !isRegister;
+      document.getElementById("formTitle").innerText = isRegister ? "Register" : "Login";
+      document.querySelector("button").innerText = isRegister ? "Register" : "Login";
+      document.querySelector(".toggle a").innerText = isRegister ? "Already have an account? Login" : "Don’t have an account? Register";
+    }
+  </script>
+</body>
+</html>

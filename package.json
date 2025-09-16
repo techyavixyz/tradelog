@@ -1,0 +1,18 @@
+{
+    "name": "trade-log-app",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "bcrypt": "^6.0.0",
+        "bcryptjs": "^3.0.2",
+        "chalk": "^5.6.2",
+        "dotenv": "^16.6.1",
+        "express": "^4.21.2",
+        "jsonwebtoken": "^9.0.2",
+        "mysql2": "^3.14.5"
+    }
+}
