@@ -311,13 +311,14 @@ table {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  min-width: 800px;
+  min-width: 1000px;
 }
 
 th, td {
-  padding: 15px 12px;
+  padding: 12px 8px;
   text-align: center;
   border-bottom: 1px solid #e9ecef;
+  font-size: 0.9rem;
 }
 
 th {
@@ -343,6 +344,7 @@ tr:hover {
   padding: 6px 12px;
   font-size: 0.8rem;
   border-radius: 6px;
+  margin: 2px;
 }
 
 .pagination {
@@ -492,6 +494,15 @@ canvas {
     text-align: center;
   }
 
+  table {
+    min-width: 900px;
+  }
+  
+  th, td {
+    padding: 8px 4px;
+    font-size: 0.8rem;
+  }
+
   .charts-container {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -527,6 +538,7 @@ canvas {
   .actions button {
     padding: 4px 8px;
     font-size: 0.75rem;
+    margin: 1px;
   }
 }
 

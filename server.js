@@ -97,6 +97,21 @@ async function ensureSchema() {
     );
     console.log(chalk.green("✅ user_id column added and linked to users table"));
   }
+  
+  // Add time columns if missing (safe migration)
+  const [buyTimeCol] = await connection.query(`SHOW COLUMNS FROM trades LIKE 'buy_time'`);
+  if (buyTimeCol.length === 0) {
+    console.log(chalk.yellow("⚙️ Adding buy_time column to trades..."));
+    await connection.query(`ALTER TABLE trades ADD COLUMN buy_time TIME DEFAULT NULL AFTER buy_price`);
+    console.log(chalk.green("✅ buy_time column added"));
+  }
+  
+  const [sellTimeCol] = await connection.query(`SHOW COLUMNS FROM trades LIKE 'sell_time'`);
+  if (sellTimeCol.length === 0) {
+    console.log(chalk.yellow("⚙️ Adding sell_time column to trades..."));
+    await connection.query(`ALTER TABLE trades ADD COLUMN sell_time TIME DEFAULT NULL AFTER sell_price`);
+    console.log(chalk.green("✅ sell_time column added"));
+  }
 }
 
 await ensureSchema();
@@ -200,7 +215,7 @@ app.get("/api/trades", authMiddleware, async (req, res) => {
 
 app.post("/api/trades", authMiddleware, async (req, res) => {
   try {
-    const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
+    const { date, symbol, strikePrice, optionType, quantity, buyPrice, buyTime, sellPrice, sellTime, pl, returnPct } = req.body;
     
     // Validation
     if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !sellPrice) {
@@ -216,8 +231,8 @@ app.post("/api/trades", authMiddleware, async (req, res) => {
     }
     
     await connection.query(
-      "INSERT INTO trades (user_id, trade_date, symbol, strike_price, option_type, quantity, buy_price, sell_price, pl, return_pct) VALUES (?,?,?,?,?,?,?,?,?,?)",
-      [req.user.id, date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct]
+      "INSERT INTO trades (user_id, trade_date, symbol, strike_price, option_type, quantity, buy_price, buy_time, sell_price, sell_time, pl, return_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      [req.user.id, date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, buyTime || null, sellPrice, sellTime || null, pl, returnPct]
     );
     
     console.log(chalk.green(`✅ Trade added for user ${req.user.email}: ${symbol} ${optionType}`));
@@ -231,7 +246,7 @@ app.post("/api/trades", authMiddleware, async (req, res) => {
 app.put("/api/trades/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, symbol, strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct } = req.body;
+    const { date, symbol, strikePrice, optionType, quantity, buyPrice, buyTime, sellPrice, sellTime, pl, returnPct } = req.body;
     
     // Validation
     if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !sellPrice) {
@@ -247,8 +262,8 @@ app.put("/api/trades/:id", authMiddleware, async (req, res) => {
     }
     
     const [result] = await connection.query(
-      "UPDATE trades SET trade_date=?, symbol=?, strike_price=?, option_type=?, quantity=?, buy_price=?, sell_price=?, pl=?, return_pct=? WHERE id=? AND user_id=?",
-      [date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, sellPrice, pl, returnPct, id, req.user.id]
+      "UPDATE trades SET trade_date=?, symbol=?, strike_price=?, option_type=?, quantity=?, buy_price=?, buy_time=?, sell_price=?, sell_time=?, pl=?, return_pct=? WHERE id=? AND user_id=?",
+      [date, symbol.toUpperCase(), strikePrice, optionType, quantity, buyPrice, buyTime || null, sellPrice, sellTime || null, pl, returnPct, id, req.user.id]
     );
     
     if (result.affectedRows === 0) {

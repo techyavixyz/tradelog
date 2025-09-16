@@ -106,12 +106,38 @@ window.onload = async function() {
 
   // Set default date to today
   document.getElementById('date').valueAsDate = new Date();
+  
+  // Set default times to current time
+  const now = new Date();
+  const timeString = now.toTimeString().slice(0, 8); // HH:MM:SS format
+  document.getElementById('buyTime').value = timeString;
+  document.getElementById('sellTime').value = timeString;
 
   // Load trades
   await loadTrades();
   
   showNotification("Welcome back! Dashboard loaded successfully.", "success");
 };
+
+// Symbol dropdown handler
+document.addEventListener('DOMContentLoaded', function() {
+  const symbolSelect = document.getElementById('symbol');
+  const customSymbolGroup = document.getElementById('customSymbolGroup');
+  const customSymbolInput = document.getElementById('customSymbol');
+  
+  if (symbolSelect) {
+    symbolSelect.addEventListener('change', function() {
+      if (this.value === 'CUSTOM') {
+        customSymbolGroup.style.display = 'block';
+        customSymbolInput.required = true;
+      } else {
+        customSymbolGroup.style.display = 'none';
+        customSymbolInput.required = false;
+        customSymbolInput.value = '';
+      }
+    });
+  }
+});
 
 // ---------- Load Trades ----------
 async function loadTrades() {
@@ -180,14 +206,16 @@ function renderTrades() {
       </td>
       <td>${t.quantity}</td>
       <td>₹${parseFloat(t.buy_price).toFixed(2)}</td>
+      <td>${t.buy_time || 'N/A'}</td>
       <td>₹${parseFloat(t.sell_price).toFixed(2)}</td>
+      <td>${t.sell_time || 'N/A'}</td>
       <td class="${pl >= 0 ? 'profit' : 'loss'}">
         <strong>${pl >= 0 ? '+' : ''}₹${pl.toFixed(2)}</strong>
       </td>
       <td class="${returnPct >= 0 ? 'profit' : 'loss'}">
         <strong>${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</strong>
       </td>
-      <td class="actions">
+      <td class="actions" style="min-width: 100px;">
         <button class="btn-warning" onclick="editTrade(${t.id})" title="Edit Trade">
           <i class="fas fa-edit"></i>
         </button>
@@ -234,16 +262,29 @@ tradeForm.addEventListener('submit', async (e) => {
   try {
     const tradeId = document.getElementById('tradeId').value;
     const date = document.getElementById('date').value;
-    const symbol = document.getElementById('symbol').value.toUpperCase();
+    
+    // Handle symbol selection
+    const symbolSelect = document.getElementById('symbol').value;
+    const customSymbol = document.getElementById('customSymbol').value;
+    const symbol = symbolSelect === 'CUSTOM' ? customSymbol.toUpperCase() : symbolSelect;
+    
     const strikePrice = parseFloat(document.getElementById('strikePrice').value);
     const optionType = document.getElementById('optionType').value;
     const quantity = parseInt(document.getElementById('quantity').value);
     const buyPrice = parseFloat(document.getElementById('buyPrice').value);
+    const buyTime = document.getElementById('buyTime').value;
     const sellPrice = parseFloat(document.getElementById('sellPrice').value);
+    const sellTime = document.getElementById('sellTime').value;
 
     // Validation
-    if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !sellPrice) {
+    if (!date || !symbol || !strikePrice || !optionType || !quantity || !buyPrice || !buyTime || !sellPrice || !sellTime) {
       showNotification("Please fill in all fields", "warning");
+      return;
+    }
+
+    // Time validation
+    if (buyTime >= sellTime) {
+      showNotification("Sell time must be after buy time", "warning");
       return;
     }
 
@@ -260,16 +301,18 @@ tradeForm.addEventListener('submit', async (e) => {
     const pl = (sellPrice - buyPrice) * quantity;
     const returnPct = ((sellPrice - buyPrice) / buyPrice * 100);
 
-    const trade = { 
-      date, 
-      symbol, 
-      strikePrice, 
-      optionType, 
-      quantity, 
-      buyPrice, 
-      sellPrice, 
-      pl, 
-      returnPct 
+    const trade = {
+      date,
+      symbol,
+      strikePrice,
+      optionType,
+      quantity,
+      buyPrice,
+      buyTime,
+      sellPrice,
+      sellTime,
+      pl,
+      returnPct
     };
 
     if (tradeId) {
@@ -300,12 +343,33 @@ function editTrade(id) {
 
   document.getElementById('tradeId').value = t.id;
   document.getElementById('date').value = t.trade_date.split("T")[0];
-  document.getElementById('symbol').value = t.symbol;
+  
+  // Handle symbol selection for editing
+  const symbolSelect = document.getElementById('symbol');
+  const customSymbolGroup = document.getElementById('customSymbolGroup');
+  const customSymbolInput = document.getElementById('customSymbol');
+  
+  // Check if symbol exists in dropdown
+  const symbolExists = Array.from(symbolSelect.options).some(option => option.value === t.symbol);
+  
+  if (symbolExists) {
+    symbolSelect.value = t.symbol;
+    customSymbolGroup.style.display = 'none';
+    customSymbolInput.required = false;
+  } else {
+    symbolSelect.value = 'CUSTOM';
+    customSymbolGroup.style.display = 'block';
+    customSymbolInput.value = t.symbol;
+    customSymbolInput.required = true;
+  }
+  
   document.getElementById('strikePrice').value = t.strike_price;
   document.getElementById('optionType').value = t.option_type;
   document.getElementById('quantity').value = t.quantity;
   document.getElementById('buyPrice').value = t.buy_price;
+  document.getElementById('buyTime').value = t.buy_time || '';
   document.getElementById('sellPrice').value = t.sell_price;
+  document.getElementById('sellTime').value = t.sell_time || '';
 
   document.getElementById('formTitleText').textContent = 'Edit Trade';
   document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
@@ -331,6 +395,16 @@ function resetForm() {
   document.getElementById('tradeId').value = "";
   document.getElementById('formTitleText').textContent = 'Add New Trade';
   document.getElementById('date').valueAsDate = new Date();
+  
+  // Reset times to current time
+  const now = new Date();
+  const timeString = now.toTimeString().slice(0, 8);
+  document.getElementById('buyTime').value = timeString;
+  document.getElementById('sellTime').value = timeString;
+  
+  // Hide custom symbol group
+  document.getElementById('customSymbolGroup').style.display = 'none';
+  document.getElementById('customSymbol').required = false;
 }
 
 // ---------- Filters ----------
@@ -537,8 +611,17 @@ function updateCharts() {
   });
 
   // Time Series Chart
-  const sortedTrades = [...filteredTrades].sort((a, b) => new Date(a.trade_date) - new Date(b.trade_date));
-  const tsLabels = sortedTrades.map(t => formatDate(t.trade_date));
+  const sortedTrades = [...filteredTrades].sort((a, b) => {
+    const dateA = new Date(a.trade_date + ' ' + (a.buy_time || '00:00:00'));
+    const dateB = new Date(b.trade_date + ' ' + (b.buy_time || '00:00:00'));
+    return dateA - dateB;
+  });
+  
+  const tsLabels = sortedTrades.map(t => {
+    const date = formatDate(t.trade_date);
+    const time = t.buy_time ? t.buy_time.slice(0, 5) : '';
+    return time ? `${date} ${time}` : date;
+  });
   const tsPL = sortedTrades.map(t => parseFloat(t.pl));
   
   if (timeSeriesChart) timeSeriesChart.destroy();
@@ -547,7 +630,7 @@ function updateCharts() {
     data: {
       labels: tsLabels,
       datasets: [{
-        label: 'P/L Over Time',
+        label: 'Intraday P/L',
         data: tsPL,
         borderColor: '#764ba2',
         backgroundColor: 'rgba(118, 75, 162, 0.1)',
@@ -567,7 +650,14 @@ function updateCharts() {
         tooltip: {
           callbacks: {
             label: function(context) {
-              return `P/L: ₹${context.parsed.y.toFixed(2)}`;
+              const trade = sortedTrades[context.dataIndex];
+              const lines = [`P/L: ₹${context.parsed.y.toFixed(2)}`];
+              if (trade.buy_time && trade.sell_time) {
+                lines.push(`Buy: ${trade.buy_time.slice(0, 5)}`);
+                lines.push(`Sell: ${trade.sell_time.slice(0, 5)}`);
+              }
+              lines.push(`Symbol: ${trade.symbol}`);
+              return lines;
             }
           }
         }
@@ -633,10 +723,10 @@ function exportCSV() {
   }
 
   try {
-    let csv = "Date,Symbol,Strike Price,Option Type,Quantity,Buy Price,Sell Price,P/L,Return %\n";
+    let csv = "Date,Symbol,Strike Price,Option Type,Quantity,Buy Price,Buy Time,Sell Price,Sell Time,P/L,Return %\n";
     
     filteredTrades.forEach(t => {
-      csv += `${t.trade_date},${t.symbol},${t.strike_price},${t.option_type},${t.quantity},${t.buy_price},${t.sell_price},${t.pl},${t.return_pct}\n`;
+      csv += `${t.trade_date},${t.symbol},${t.strike_price},${t.option_type},${t.quantity},${t.buy_price},${t.buy_time || 'N/A'},${t.sell_price},${t.sell_time || 'N/A'},${t.pl},${t.return_pct}\n`;
     });
 
     // Add summary
@@ -722,9 +812,9 @@ function openAllTrades() {
           }
           th, td { 
             border: 1px solid #ddd; 
-            padding: 12px 8px; 
+            padding: 8px 6px; 
             text-align: center; 
-            font-size: 0.9rem;
+            font-size: 0.8rem;
           }
           th { 
             background: linear-gradient(135deg, #667eea, #764ba2); 
@@ -737,7 +827,7 @@ function openAllTrades() {
           .loss { color: #dc3545; font-weight: bold; }
           @media (max-width: 768px) {
             body { margin: 10px; }
-            th, td { padding: 8px 4px; font-size: 0.8rem; }
+            th, td { padding: 6px 3px; font-size: 0.7rem; }
           }
           @media print {
             body { margin: 0; }
@@ -779,7 +869,9 @@ function openAllTrades() {
               <th>Type</th>
               <th>Qty</th>
               <th>Buy Price</th>
+              <th>Buy Time</th>
               <th>Sell Price</th>
+              <th>Sell Time</th>
               <th>P/L</th>
               <th>Return %</th>
             </tr>
@@ -798,7 +890,9 @@ function openAllTrades() {
         <td>${t.option_type}</td>
         <td>${t.quantity}</td>
         <td>₹${parseFloat(t.buy_price).toFixed(2)}</td>
+        <td>${t.buy_time || 'N/A'}</td>
         <td>₹${parseFloat(t.sell_price).toFixed(2)}</td>
+        <td>${t.sell_time || 'N/A'}</td>
         <td class="${pl >= 0 ? 'profit' : 'loss'}">${pl >= 0 ? '+₹' : '₹'}${pl.toFixed(2)}</td>
         <td class="${returnPct >= 0 ? 'profit' : 'loss'}">${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</td>
       </tr>
